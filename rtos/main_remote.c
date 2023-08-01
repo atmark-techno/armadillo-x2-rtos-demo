@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016, Freescale Semiconductor, Inc.
  * Copyright 2016-2020 NXP
+ * Copyright 2023 Atmark Techno
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -21,43 +22,28 @@
 
 #include "fsl_uart.h"
 #include "rsc_table.h"
-/*******************************************************************************
- * Definitions
- ******************************************************************************/
 #define RPMSG_LITE_LINK_ID (RL_PLATFORM_IMX8MP_M7_USER_LINK_ID)
 #define RPMSG_LITE_SHMEM_BASE (VDEV0_VRING_BASE)
-#define RPMSG_LITE_NS_ANNOUNCE_STRING "rpmsg-openamp-demo-channel"
-#define RPMSG_LITE_MASTER_IS_LINUX
 
-#define APP_DEBUG_UART_BAUDRATE (115200U) /* Debug console baud rate. */
 #define APP_TASK_STACK_SIZE (256U)
 #ifndef LOCAL_EPT_ADDR
 #define LOCAL_EPT_ADDR (30U)
 #endif
-#define APP_RPMSG_READY_EVENT_DATA (1U)
 
-typedef struct the_message {
-	uint32_t DATA;
-} THE_MESSAGE, *THE_MESSAGE_PTR;
-
-static volatile THE_MESSAGE msg = { 0 };
-#ifdef RPMSG_LITE_MASTER_IS_LINUX
-static char helloMsg[13];
-#endif /* RPMSG_LITE_MASTER_IS_LINUX */
-
-/*******************************************************************************
- * Prototypes
- ******************************************************************************/
+#include "../common/protocol.h"
 
 /*******************************************************************************
  * Code
  ******************************************************************************/
 static TaskHandle_t app_task_handle = NULL;
 
-static struct rpmsg_lite_instance *volatile my_rpmsg = NULL;
+static struct rpmsg_lite_instance *volatile rpmsg = NULL;
 
-static struct rpmsg_lite_endpoint *volatile my_ept = NULL;
-static volatile rpmsg_queue_handle my_queue = NULL;
+static struct rpmsg_lite_endpoint *volatile rpmsg_endpoint = NULL;
+static volatile rpmsg_queue_handle rpmsg_queue = NULL;
+
+// info
+static int log_level = 2;
 
 void app_destroy_task(void)
 {
@@ -66,19 +52,19 @@ void app_destroy_task(void)
 		app_task_handle = NULL;
 	}
 
-	if (my_ept) {
-		rpmsg_lite_destroy_ept(my_rpmsg, my_ept);
-		my_ept = NULL;
+	if (rpmsg_endpoint) {
+		rpmsg_lite_destroy_ept(rpmsg, rpmsg_endpoint);
+		rpmsg_endpoint = NULL;
 	}
 
-	if (my_queue) {
-		rpmsg_queue_destroy(my_rpmsg, my_queue);
-		my_queue = NULL;
+	if (rpmsg_queue) {
+		rpmsg_queue_destroy(rpmsg, rpmsg_queue);
+		rpmsg_queue = NULL;
 	}
 
-	if (my_rpmsg) {
-		rpmsg_lite_deinit(my_rpmsg);
-		my_rpmsg = NULL;
+	if (rpmsg) {
+		rpmsg_lite_deinit(rpmsg);
+		rpmsg = NULL;
 	}
 }
 
@@ -87,101 +73,86 @@ static void app_nameservice_isr_cb(uint32_t new_ept, const char *new_ept_name,
 {
 }
 
-#ifdef MCMGR_USED
-/*!
- * @brief Application-specific implementation of the SystemInitHook() weak function.
- */
-void SystemInitHook(void)
+static void log(uint32_t remote_addr, int level, char *log)
 {
-	/* Initialize MCMGR - low level multicore management library. Call this
-       function as close to the reset entry as possible to allow CoreUp event
-       triggering. The SystemInitHook() weak function overloading is used in this
-       application. */
-	(void)MCMGR_EarlyInit();
+	if (level - TYPE_LOG_DEBUG < log_level)
+		return;
+
+	// XXX va_args/vsprintf
+	struct msg msg = {
+		.type = level,
+		.data = strlen(log) + 1,
+	};
+
+	(void)rpmsg_lite_send(rpmsg, rpmsg_endpoint, remote_addr, (char *)&msg,
+			      sizeof(msg), RL_BLOCK);
+	(void)rpmsg_lite_send(rpmsg, rpmsg_endpoint, remote_addr, log, msg.data,
+			      RL_BLOCK);
 }
-#endif /* MCMGR_USED */
 
 static void app_task(void *param)
 {
+	struct msg msg;
 	volatile uint32_t remote_addr;
 	volatile rpmsg_ns_handle ns_handle;
 
-	/* Print the initial banner */
-	(void)PRINTF("\r\nRPMSG Ping-Pong FreeRTOS RTOS API Demo...\r\n");
+	rpmsg = rpmsg_lite_remote_init((void *)RPMSG_LITE_SHMEM_BASE,
+				       RPMSG_LITE_LINK_ID, RL_NO_FLAGS);
+	rpmsg_lite_wait_for_link_up(rpmsg, RL_BLOCK);
 
-#ifdef MCMGR_USED
-	uint32_t startupData;
-	mcmgr_status_t status;
-
-	/* Get the startup data */
-	do {
-		status = MCMGR_GetStartupData(&startupData);
-	} while (status != kStatus_MCMGR_Success);
-
-	my_rpmsg = rpmsg_lite_remote_init((void *)(char *)startupData,
-					  RPMSG_LITE_LINK_ID, RL_NO_FLAGS);
-
-	/* Signal the other core we are ready by triggering the event and passing the APP_RPMSG_READY_EVENT_DATA */
-	(void)MCMGR_TriggerEvent(kMCMGR_RemoteApplicationEvent,
-				 APP_RPMSG_READY_EVENT_DATA);
-#else
-	(void)PRINTF("RPMSG Share Base Addr is 0x%x\r\n",
-		     RPMSG_LITE_SHMEM_BASE);
-	my_rpmsg = rpmsg_lite_remote_init((void *)RPMSG_LITE_SHMEM_BASE,
-					  RPMSG_LITE_LINK_ID, RL_NO_FLAGS);
-#endif /* MCMGR_USED */
-	rpmsg_lite_wait_for_link_up(my_rpmsg, RL_BLOCK);
-	(void)PRINTF("Link is up!\r\n");
-
-	my_queue = rpmsg_queue_create(my_rpmsg);
-	my_ept = rpmsg_lite_create_ept(my_rpmsg, LOCAL_EPT_ADDR,
-				       rpmsg_queue_rx_cb, my_queue);
-	ns_handle =
-		rpmsg_ns_bind(my_rpmsg, app_nameservice_isr_cb, ((void *)0));
-	/* Introduce some delay to avoid NS announce message not being captured by the master side.
-       This could happen when the remote side execution is too fast and the NS announce message is triggered
-       before the nameservice_isr_cb is registered on the master side. */
+	rpmsg_queue = rpmsg_queue_create(rpmsg);
+	rpmsg_endpoint = rpmsg_lite_create_ept(rpmsg, LOCAL_EPT_ADDR,
+					       rpmsg_queue_rx_cb, rpmsg_queue);
+	ns_handle = rpmsg_ns_bind(rpmsg, app_nameservice_isr_cb, NULL);
+	/* Introduce some delay to avoid NS announce message not being
+	 * captured by the master side.
+         * This could happen when the remote side execution is too fast and
+	 * the NS announce message is triggered before the nameservice_isr_cb
+	 * is registered on the master side.
+	 */
 	SDK_DelayAtLeastUs(1000000U, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
-	(void)rpmsg_ns_announce(my_rpmsg, my_ept, RPMSG_LITE_NS_ANNOUNCE_STRING,
+	(void)rpmsg_ns_announce(rpmsg, rpmsg_endpoint,
+				RPMSG_LITE_NS_ANNOUNCE_STRING,
 				(uint32_t)RL_NS_CREATE);
-	(void)PRINTF("Nameservice announce sent.\r\n");
 
-#ifdef RPMSG_LITE_MASTER_IS_LINUX
-	/* Wait Hello handshake message from Remote Core. */
-	(void)rpmsg_queue_recv(my_rpmsg, my_queue, (uint32_t *)&remote_addr,
-			       helloMsg, sizeof(helloMsg), ((void *)0),
-			       RL_BLOCK);
-#endif /* RPMSG_LITE_MASTER_IS_LINUX */
+	/* Verify version matches and send our's as well */
+	(void)rpmsg_queue_recv(rpmsg, rpmsg_queue, (uint32_t *)&remote_addr,
+			       (char *)&msg, sizeof(msg), NULL, RL_BLOCK);
+	assert(msg.type == TYPE_VERSION);
+	assert(msg.data == 0);
+	(void)rpmsg_lite_send(rpmsg, rpmsg_endpoint, remote_addr, (char *)&msg,
+			      sizeof(msg), RL_BLOCK);
 
-	while (msg.DATA <= 100U) {
-		(void)PRINTF("Waiting for ping...\r\n");
-		(void)rpmsg_queue_recv(my_rpmsg, my_queue,
+	while (true) {
+		(void)rpmsg_queue_recv(rpmsg, rpmsg_queue,
 				       (uint32_t *)&remote_addr, (char *)&msg,
-				       sizeof(THE_MESSAGE), ((void *)0),
-				       RL_BLOCK);
-		msg.DATA += 15;
-		(void)PRINTF("Sending pong...\r\n");
-		(void)rpmsg_lite_send(my_rpmsg, my_ept, remote_addr,
-				      (char *)&msg, sizeof(THE_MESSAGE),
-				      RL_BLOCK);
+				       sizeof(msg), NULL, RL_BLOCK);
+		switch (msg.type) {
+		case TYPE_GPIO:
+			log(remote_addr, TYPE_LOG_DEBUG, "toggling gpio");
+			break;
+		case TYPE_LOG_SET_LEVEL:
+			log_level = msg.data;
+			log(remote_addr, TYPE_LOG_INFO, "set log level");
+			break;
+		default:
+			log(remote_addr, TYPE_LOG_WARN,
+			    "bad type, stopping loop");
+			goto out;
+		}
 	}
+out:
 
-	(void)PRINTF("Ping pong done, deinitializing...\r\n");
+	(void)rpmsg_lite_destroy_ept(rpmsg, rpmsg_endpoint);
+	rpmsg_endpoint = NULL;
+	(void)rpmsg_queue_destroy(rpmsg, rpmsg_queue);
+	rpmsg_queue = NULL;
+	(void)rpmsg_ns_unbind(rpmsg, ns_handle);
+	(void)rpmsg_lite_deinit(rpmsg);
+	rpmsg = NULL;
 
-	(void)rpmsg_lite_destroy_ept(my_rpmsg, my_ept);
-	my_ept = ((void *)0);
-	(void)rpmsg_queue_destroy(my_rpmsg, my_queue);
-	my_queue = ((void *)0);
-	(void)rpmsg_ns_unbind(my_rpmsg, ns_handle);
-	(void)rpmsg_lite_deinit(my_rpmsg);
-	my_rpmsg = ((void *)0);
-	msg.DATA = 0U;
-
-	(void)PRINTF("Looping forever...\r\n");
-
-	/* End of the example */
-	for (;;) {
-	}
+	for (;;)
+		;
 }
 
 void app_create_task(void)
@@ -214,11 +185,6 @@ int main(void)
 	BOARD_InitDebugConsole();
 
 	copyResourceTable();
-
-#ifdef MCMGR_USED
-	/* Initialize MCMGR before calling its API */
-	(void)MCMGR_Init();
-#endif /* MCMGR_USED */
 
 	app_create_task();
 	vTaskStartScheduler();
