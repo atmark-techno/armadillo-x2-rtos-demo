@@ -72,6 +72,7 @@ set(CMAKE_MODULE_PATH
     ${SdkRootDirPath}/core/drivers/rdc
     ${SdkRootDirPath}/core/devices/MIMX8ML8
     ${SdkRootDirPath}/core/utilities
+    ${SdkRootDirPath}/core/drivers/igpio
     ${SdkRootDirPath}/core/components/uart
     ${SdkRootDirPath}/core/components/serial_manager
     ${SdkRootDirPath}/core/components/lists
@@ -113,6 +114,8 @@ include(component_serial_manager)
 include(component_lists)
 
 include(component_serial_manager_uart)
+
+include(driver_igpio)
 
 include(driver_iuart)
 

@@ -45,6 +45,7 @@ BOARD_InitPins:
 - pin_list:
   - {pin_num: AJ5, peripheral: UART4, signal: uart_rx, pin_signal: UART4_RXD, PE: Enabled, HYS: CMOS, PUE: Weak_Pull_Up, FSEL: Slow, DSE: X1}
   - {pin_num: AH5, peripheral: UART4, signal: uart_tx, pin_signal: UART4_TXD, PE: Enabled, HYS: CMOS, PUE: Weak_Pull_Up, FSEL: Slow, DSE: X1}
+  - XXX other pins added manually
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 
@@ -61,6 +62,11 @@ void BOARD_InitPins(void) {                                /*!< Function assigne
                         IOMUXC_SW_PAD_CTL_PAD_PE_MASK);
     IOMUXC_SetPinMux(IOMUXC_UART4_TXD_UART4_TX, 0U);
     IOMUXC_SetPinConfig(IOMUXC_UART4_TXD_UART4_TX, 
+                        IOMUXC_SW_PAD_CTL_PAD_PUE_MASK |
+                        IOMUXC_SW_PAD_CTL_PAD_PE_MASK);
+    IOMUXC_SetPinMux(IOMUXC_SD1_DATA6_GPIO2_IO08, 0U);
+    IOMUXC_SetPinConfig(IOMUXC_SD1_DATA6_GPIO2_IO08,
+                        IOMUXC_SW_PAD_CTL_PAD_DSE(3U) |
                         IOMUXC_SW_PAD_CTL_PAD_PUE_MASK |
                         IOMUXC_SW_PAD_CTL_PAD_PE_MASK);
 }

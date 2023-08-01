@@ -20,7 +20,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "fsl_uart.h"
+#include "fsl_gpio.h"
 #include "rsc_table.h"
 #define RPMSG_LITE_LINK_ID (RL_PLATFORM_IMX8MP_M7_USER_LINK_ID)
 #define RPMSG_LITE_SHMEM_BASE (VDEV0_VRING_BASE)
@@ -129,7 +129,13 @@ static void app_task(void *param)
 				       sizeof(msg), NULL, RL_BLOCK);
 		switch (msg.type) {
 		case TYPE_GPIO:
+			if (msg.data > 1) {
+				log(remote_addr, TYPE_LOG_WARN,
+				    "bad gpio value, stopping loop");
+				goto out;
+			}
 			log(remote_addr, TYPE_LOG_DEBUG, "toggling gpio");
+			GPIO_WritePinOutput(GPIO2, 8U, msg.data);
 			break;
 		case TYPE_LOG_SET_LEVEL:
 			log_level = msg.data;
@@ -183,6 +189,10 @@ int main(void)
 	BOARD_InitBootPins();
 	BOARD_BootClockRUN();
 	BOARD_InitDebugConsole();
+
+	/* test done with GPIO2_IO08 */
+	gpio_pin_config_t config = {kGPIO_DigitalOutput, 1, kGPIO_NoIntmode};
+	GPIO_PinInit(GPIO2, 8U, &config);
 
 	copyResourceTable();
 
