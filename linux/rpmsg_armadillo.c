@@ -17,6 +17,7 @@ enum ra_state {
 	LOG_DEBUG,
 	LOG_INFO,
 	LOG_WARN,
+	DEAD,
 };
 
 struct rpmsg_armadillo {
@@ -35,6 +36,7 @@ static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		if (len != sizeof(*msg)) {
 			dev_err(&rpdev->dev, "message had unexpected size %d\n",
 				len);
+			ra->state = DEAD;
 			return 0;
 		}
 		if (msg->type >= TYPE_LOG_DEBUG && msg->type <= TYPE_LOG_WARN) {
@@ -47,17 +49,19 @@ static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		if (len != sizeof(*msg)) {
 			dev_err(&rpdev->dev, "message had unexpected size %d\n",
 				len);
+			ra->state = DEAD;
 			return 0;
 		}
 		if (msg->type != TYPE_VERSION) {
 			dev_err(&rpdev->dev,
 				"got non-init message in init state: %d\n",
 				msg->type);
-			// XXX destroy?
+			ra->state = DEAD;
 			return 0;
 		}
 		if (msg->data != VERSION) {
 			dev_err(&rpdev->dev, "bad version %d\n", msg->data);
+			ra->state = DEAD;
 			return 0;
 		}
 		ra->state = READY;
@@ -69,6 +73,7 @@ static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		dev_err(&rpdev->dev,
 			"log not of expected length: got %d, expected %d\n",
 			len, ra->length);
+		ra->state = DEAD;
 		return 0;
 	}
 	dev_info(&rpdev->dev, "%s\n", (char *)data);
