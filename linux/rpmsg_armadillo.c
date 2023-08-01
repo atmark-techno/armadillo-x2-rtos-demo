@@ -9,6 +9,10 @@
 #include <linux/module.h>
 #include <linux/rpmsg.h>
 
+// from drivers/rpmsg/rpmsg_internal.h,
+// we need to rpmsg_device for sysfs file handlers
+#define to_rpmsg_device(d) container_of(d, struct rpmsg_device, dev)
+
 #include "../common/protocol.h"
 
 enum ra_state {
@@ -26,11 +30,75 @@ struct rpmsg_armadillo {
 	uint32_t length;
 };
 
+static ssize_t set_gpio_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+	int ret;
+	unsigned int state;
+	struct msg msg = {
+		.type = TYPE_GPIO,
+	};
+
+	ret = kstrtoint(buf, 0, &state);
+	if (ret < 0 || state > 1)
+		return -EINVAL;
+
+	dev_info(dev, "setting gpio to %d\n", state);
+	msg.data = state;
+
+	ret = rpmsg_send(rpdev->ept, &msg, sizeof(msg));
+	if (ret) {
+		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+static DEVICE_ATTR_WO(set_gpio);
+
+static ssize_t set_loglevel_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+	int ret;
+	unsigned int loglevel;
+	struct msg msg = {
+		.type = TYPE_LOG_SET_LEVEL,
+	};
+
+	ret = kstrtouint(buf, 0, &loglevel);
+	if (ret < 0 || loglevel > 4)
+		return -EINVAL;
+
+	dev_info(dev, "setting loglevel to %d\n", loglevel);
+	msg.data = loglevel;
+
+	ret = rpmsg_send(rpdev->ept, &msg, sizeof(msg));
+	if (ret) {
+		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+static DEVICE_ATTR_WO(set_loglevel);
+
+static struct attribute *rpmsg_armadillo_attrs[] = {
+	&dev_attr_set_gpio.attr, &dev_attr_set_loglevel.attr, NULL
+};
+
+static struct attribute_group rpmsg_armadillo_attrgroup = {
+	.attrs = rpmsg_armadillo_attrs,
+};
+
 static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 			      void *priv, u32 src)
 {
 	struct rpmsg_armadillo *ra = dev_get_drvdata(&rpdev->dev);
 	struct msg *msg = data;
+	int ret;
 
 	if (ra->state == READY) {
 		if (len != sizeof(*msg)) {
@@ -64,8 +132,15 @@ static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 			ra->state = DEAD;
 			return 0;
 		}
-		ra->state = READY;
 		dev_info(&rpdev->dev, "rpmsg_armadillo ready\n");
+		ra->state = READY;
+		ret = sysfs_create_group(&rpdev->dev.kobj,
+					 &rpmsg_armadillo_attrgroup);
+		if (ret) {
+			dev_err(&rpdev->dev,
+				"could not create sysfs file: %d\n", ret);
+			ra->state = DEAD;
+		}
 		return 0;
 	}
 	// log
