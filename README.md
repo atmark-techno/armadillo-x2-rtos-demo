@@ -44,10 +44,10 @@ mkswu rtos.desc
 
 #### manual method
 
-1. Copy rtos/armgcc/release/*.bin to Armadillo
+1. Copy `rtos/armgcc/release/armadillo_rtos_demo.bin` to Armadillo
 ```
 armadillo:~# mount /dev/sda1 /mnt
-armadillo:~# cp /mnt/XXX.bin /boot/cortex.bin
+armadillo:~# cp /mnt/armadillo_rtos_demo.bin /boot/cortex.bin
 armadillo:~# persist_file -v /boot/cortex.bin
 ```
 

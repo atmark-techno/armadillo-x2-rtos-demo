@@ -28,11 +28,11 @@ SET(EXECUTABLE_OUTPUT_PATH ${ProjDirPath}/${CMAKE_BUILD_TYPE})
 SET(LIBRARY_OUTPUT_PATH ${ProjDirPath}/${CMAKE_BUILD_TYPE})
 
 
-project(rpmsg_lite_pingpong_rtos_linux_remote)
+project(armadillo_rtos_demo)
 
 set(MCUX_BUILD_TYPES debug release ddr_debug ddr_release flash_debug flash_release)
 
-set(MCUX_SDK_PROJECT_NAME rpmsg_lite_pingpong_rtos_linux_remote.elf)
+set(MCUX_SDK_PROJECT_NAME armadillo_rtos_demo.elf)
 
 if (NOT DEFINED SdkRootDirPath)
     SET(SdkRootDirPath ${SdkRootDirPath})
@@ -140,5 +140,5 @@ target_link_libraries(${MCUX_SDK_PROJECT_NAME} PRIVATE ${TARGET_LINK_SYSTEM_LIBR
 TARGET_LINK_LIBRARIES(${MCUX_SDK_PROJECT_NAME} PRIVATE -Wl,--end-group)
 
 ADD_CUSTOM_COMMAND(TARGET ${MCUX_SDK_PROJECT_NAME} POST_BUILD COMMAND ${CMAKE_OBJCOPY}
--Obinary ${EXECUTABLE_OUTPUT_PATH}/${MCUX_SDK_PROJECT_NAME} ${EXECUTABLE_OUTPUT_PATH}/rpmsg_lite_pingpong_rtos_linux_remote.bin)
+-Obinary ${EXECUTABLE_OUTPUT_PATH}/${MCUX_SDK_PROJECT_NAME} ${EXECUTABLE_OUTPUT_PATH}/armadillo_rtos_demo.bin)
 
