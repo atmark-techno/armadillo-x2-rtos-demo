@@ -123,6 +123,44 @@ armadillo:~# persist_file -vp /boot/boot.*
 armadillo:~# reboot
 ```
 
+### Verify it works
+
+If install succeeded, you should have FreeRTOS running on the cortex M7, and a module driver on linux allowing to communicate with the RTOS.
+
+1. dmesg should contain informations about rpmsg and the module, such as:
+
+```
+[    0.048219] imx rpmsg driver is registered.
+[    1.158745] virtio_rpmsg_bus virtio0: rpmsg host is online
+[    2.158859] virtio_rpmsg_bus virtio0: creating channel rpmsg-armadillo-demo-channel addr 0x1e
+[    3.372122] rpmsg_armadillo: no symbol version for module_layout
+[    3.372135] rpmsg_armadillo: loading out-of-tree module taints kernel.
+[    3.372182] rpmsg_armadillo: module verification failed: signature and/or required key missing - tainting kernel
+[    3.374029] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: probing rpmsg_armadillo on channel 0x400 -> 0x1e
+[    3.374088] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: rpmsg_armadillo ready
+```
+
+2. the module will create a couple of writable files in `/sys/class/remoteproc/remoteproc0/remoteproc0\#vdev0buffer/virtio0/virtio0.rpmsg-armadillo-demo-channel.-1.30/`:
+
+```
+armadillo:~# cd /sys/class/remoteproc/remoteproc0/remoteproc0\#vdev0buffer/virtio0/virtio0.rpmsg-armadillo-demo-channel.-1.30/
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# ls set*
+set_gpio  set_loglevel
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 0 > set_loglevel
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# dmesg | tail
+[  159.965872] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting loglevel to 0
+[  159.966227] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: set log level
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
+[  181.364096] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting gpio to 1
+[  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: toggling gpio
+```
+
+- `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.
+The 'set log level' and 'toggling gpio' messages above come from the RTOS application through the rpmsg channel.
+
+- `set_gpio` allow controlling GPIO2 pin 8, which can be checked on CON12 pin 13 on Armadillo IoT G4.
+Writing 1 sets it to high and 0 to low.
+
 ## Development
 
 ### Update without reboot
