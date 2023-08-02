@@ -1,0 +1,41 @@
+# The west manifest file (west.yml) for this example, based on the MCUXpresso SDK.
+#
+# The per-workspace west configuration file, ${workspace_path}/.west/config,
+# specifies the path of the project containing this manifest file, the
+# path is relative to the workspace location ${workspace_path}.
+#
+#     [manifest]
+#     path = core
+#
+# See the west documentation for more information:
+#
+# https://docs.zephyrproject.org/latest/guides/west/index.html
+manifest:
+  remotes:
+  - name: nxp
+    url-base: https://github.com/NXP
+  - name: nxp_zephyr
+    url-base: https://github.com/nxp-zephyr
+  - name: nxp-mcuxpresso
+    url-base: https://github.com/nxp-mcuxpresso
+  defaults:
+    remote: nxp-mcuxpresso
+  projects:
+  - name: mcux-sdk
+    revision: main
+    path: mcuxsdk/core
+  - name: FreeRTOS-Kernel
+    revision: MCUX_2.13.1
+    path: mcuxsdk/rtos/freertos/freertos-kernel
+  - name: mcux-sdk-middleware-multicore
+    path: mcuxsdk/middleware/multicore
+    revision: MCUX_2.13.1
+  - name: rpmsg-lite
+    path: mcuxsdk/middleware/multicore/rpmsg_lite
+    url: https://github.com/nxp-mcuxpresso/rpmsg-lite
+    revision: v5.0.0
+  - name: CMSIS_5
+    path: mcuxsdk/core/CMSIS
+    revision: MCUX_2.13.0
+  self:
+    path: .

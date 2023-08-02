@@ -4,17 +4,33 @@
 
 ### Setup
 
-We use the NXP mcuxpresso sdk for this example, initialize the repo and install required toolchain with these commands:
-(~1.2GB download, ~9GB on disk)
+We use the NXP mcuxpresso sdk for this example.
+
+First, install requirements (~200MB download, ~2GB on disk)
 
 ```
+linux$ apt install gcc-arm-none-eabi python3-virtualenv
 linux$ virtualenv west-venv
 linux$ ./west-venv/bin/pip install west
-linux$ ./west-venv/bin/west init -m https://github.com/NXPmicro/mcux-sdk mcuxsdk
+```
+
+Then you can either install the whole mcuxpresso sdk, or just required components for the example. Using the full repository is recommended for development (to e.g. add other drivers)
+
+Full repository (~1GB download, ~7GB on disk):
+
+```
+linux$ ./west-venv/bin/west init -m https://github.com/nxp-mcuxpresso/mcux-sdk mcuxsdk
 linux$ cd mcuxsdk
 linux$ ../west-venv/bin/west update
-linux$ apt install gcc-arm-none-eabi
 ```
+
+Minimal repository (500MB download, 1.3GB on disk):
+
+```
+linux$ ./west-venv/bin/west init -l west
+linux$ ./west-venv/bin/west update
+```
+
 
 ### Build RTOS application
 
