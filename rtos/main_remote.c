@@ -73,12 +73,13 @@ static void app_nameservice_isr_cb(uint32_t new_ept, const char *new_ept_name,
 {
 }
 
+// sends constant strings to linux for logging if
+// requested level is higher than current log level
 static void log(uint32_t remote_addr, int level, char *log)
 {
 	if (level - TYPE_LOG_DEBUG < log_level)
 		return;
 
-	// XXX va_args/vsprintf
 	struct msg msg = {
 		.type = level,
 		.data = strlen(log) + 1,
@@ -90,6 +91,8 @@ static void log(uint32_t remote_addr, int level, char *log)
 			      RL_BLOCK);
 }
 
+// main task:
+// setup communication with linux and waits forever for messages
 static void app_task(void *param)
 {
 	struct msg msg;
