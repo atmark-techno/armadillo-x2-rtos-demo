@@ -6,7 +6,11 @@ swdesc_option version=1
 swdesc_files --dest /boot rtos/armgcc/release/armadillo_rtos_demo.bin
 	
 # install the kernel module
-kver="$(modinfo -F vermagic linux/rpmsg_armadillo.ko)" || exit
+modinfo=$(PATH="$PATH:/usr/sbin" command -v modinfo) \
+	|| error "could not find modinfo command to determine module install path"
+kver="$("$modinfo" -F vermagic linux/rpmsg_armadillo.ko)" \
+        && [ -n "$kver" ] \
+	|| error "could not get linux/rpmsg_armadillo.ko module version"
 kver="${kver%% *}"
 swdesc_exec linux/rpmsg_armadillo.ko \
 	"mkdir -p /lib/modules/$kver/extras" \
