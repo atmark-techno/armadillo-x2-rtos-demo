@@ -1,0 +1,8 @@
+# load and boot cortex core.
+# The commands below are for DDR mode
+load mmc ${mmcdev}:${mmcpart} 0x80000000 /boot/armadillo_rtos_demo.bin
+dcache flush
+bootaux 0x80000000
+
+# boot into linux
+run loadimage && run mmcboot

@@ -1,0 +1,34 @@
+# we install to rootfs, so set version as extra_os from start
+swdesc_option component=extra_os.rtos
+swdesc_option version=1
+
+# install rtos binary
+swdesc_files --dest /boot rtos/armgcc/release/armadillo_rtos_demo.bin
+	
+# install the kernel module
+kver="$(modinfo -F vermagic linux/rpmsg_armadillo.ko)" || exit
+kver="${kver%% *}"
+swdesc_exec linux/rpmsg_armadillo.ko \
+	"mkdir -p /lib/modules/$kver/extras" \
+	"mv \$1 /lib/modules/$kver/extras" \
+	"depmod $kver"
+
+# copy and enable dtb overlay
+swdesc_files --dest /boot dts/armadillo_iotg_g4-rtos-demo.dtbo
+swdesc_script "$SCRIPT_DIR/examples/update_overlays.sh" -- \
+	"armadillo_iotg_g4-rtos-demo.dtbo"
+
+# tell u-boot to start up the cortex M core
+swdesc_exec boot_script/boot.txt \
+	'mv $1 /boot/boot.txt' \
+	'mkbootscr /boot/boot.txt'
+
+# update preserve_files list
+# note all kernel modules are already preserved if the kernel had
+# been installed properly, so this is not done here.
+swdesc_script "$SCRIPT_DIR/examples/update_preserve_files.sh" -- \
+	"/boot/armadillo_rtos_demo.bin" \
+	"/boot/armadillo_iotg_g4-rtos-demo.dtbo" \
+	"/boot/boot.txt" \
+	"/boot/boot.scr"
+
