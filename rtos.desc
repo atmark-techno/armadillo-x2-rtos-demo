@@ -1,29 +1,41 @@
+# file names to use: change this if you rename the project.
+RTOS_BIN="rtos/*/*/armadillo_rtos_demo.bin"
+KMOD="linux/rpmsg_armadillo.ko"
+DTBO="dts/armadillo_iotg_g4-rtos-demo.dtbo"
+BOOT="boot_script/boot.txt"
+
+
 # we install to rootfs, so set version as extra_os from start
 swdesc_option component=extra_os.rtos
 swdesc_option version=1
 
-# install rtos binary
-swdesc_files --dest /boot rtos/armgcc/release/armadillo_rtos_demo.bin
+
+# install rtos binary. The newest file matching wildcard is installed
+# versions are built.
+rtos_bin=$(ls -t $RTOS_BIN | head -n 1)
+[ -n "$rtos_bin" ] || error "Could not find rtos binary at $RTOS_BIN"
+echo "Using $rtos_bin"
+swdesc_files --dest /boot "$rtos_bin"
 	
 # install the kernel module
 modinfo=$(PATH="$PATH:/usr/sbin" command -v modinfo) \
-	|| error "could not find modinfo command to determine module install path"
-kver="$("$modinfo" -F vermagic linux/rpmsg_armadillo.ko)" \
+	|| error "Could not find modinfo command to determine module install path"
+kver="$("$modinfo" -F vermagic "$KMOD")" \
         && [ -n "$kver" ] \
-	|| error "could not get linux/rpmsg_armadillo.ko module version"
+	|| error "Could not get "$KMOD" module version"
 kver="${kver%% *}"
-swdesc_exec linux/rpmsg_armadillo.ko \
+swdesc_exec "$KMOD" \
 	"mkdir -p /lib/modules/$kver/extras" \
-	"mv \$1 /lib/modules/$kver/extras" \
+	"mv \$1 /lib/modules/$kver/extras/${KMOD##*/}" \
 	"depmod $kver"
 
 # copy and enable dtb overlay
-swdesc_files --dest /boot dts/armadillo_iotg_g4-rtos-demo.dtbo
+swdesc_files --dest /boot "$DTBO"
 swdesc_script "$SCRIPT_DIR/examples/update_overlays.sh" -- \
-	"armadillo_iotg_g4-rtos-demo.dtbo"
+	"${DTBO##*/}"
 
 # tell u-boot to start up the cortex M core
-swdesc_exec boot_script/boot.txt \
+swdesc_exec "$BOOT" \
 	'mv $1 /boot/boot.txt' \
 	'mkbootscr /boot/boot.txt'
 
@@ -31,8 +43,8 @@ swdesc_exec boot_script/boot.txt \
 # note all kernel modules are already preserved if the kernel had
 # been installed properly, so this is not done here.
 swdesc_script "$SCRIPT_DIR/examples/update_preserve_files.sh" -- \
-	"/boot/armadillo_rtos_demo.bin" \
-	"/boot/armadillo_iotg_g4-rtos-demo.dtbo" \
+	"/boot/${RTOS_BIN##*/}" \
+	"/boot/${DTBO##*/}" \
 	"/boot/boot.txt" \
 	"/boot/boot.scr"
 
