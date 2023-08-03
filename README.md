@@ -149,10 +149,10 @@ set_gpio  set_loglevel
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 0 > set_loglevel
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# dmesg | tail
 [  159.965872] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting loglevel to 0
-[  159.966227] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: set log level
+[  159.966227] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] set log level
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
 [  181.364096] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting gpio to 1
-[  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: toggling gpio
+[  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] toggling gpio
 ```
 
 - `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.

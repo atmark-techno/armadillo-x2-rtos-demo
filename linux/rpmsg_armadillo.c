@@ -151,7 +151,7 @@ static int rpmsg_armadillo_cb(struct rpmsg_device *rpdev, void *data, int len,
 		ra->state = DEAD;
 		return 0;
 	}
-	dev_info(&rpdev->dev, "%s\n", (char *)data);
+	dev_info(&rpdev->dev, "[remote] %s\n", (char *)data);
 	ra->state = READY;
 
 	return 0;
