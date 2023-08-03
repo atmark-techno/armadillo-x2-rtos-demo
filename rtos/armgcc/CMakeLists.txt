@@ -51,16 +51,15 @@ add_executable(${MCUX_SDK_PROJECT_NAME}
 "${ProjDirPath}/../rsc_table.c"
 "${ProjDirPath}/../rsc_table.h"
 "${ProjDirPath}/../remoteproc.h"
-"${SdkRootDirPath}/core/boards/evkmimx8mp/board.c"
-"${SdkRootDirPath}/core/boards/evkmimx8mp/board.h"
-"${SdkRootDirPath}/core/boards/evkmimx8mp/clock_config.c"
-"${SdkRootDirPath}/core/boards/evkmimx8mp/clock_config.h"
+"${ProjDirPath}/../board.c"
+"${ProjDirPath}/../board.h"
+"${ProjDirPath}/../clock_config.c"
+"${ProjDirPath}/../clock_config.h"
 "${ProjDirPath}/../fsl_iomuxc.h"
 )
 
 target_include_directories(${MCUX_SDK_PROJECT_NAME} PUBLIC
     ${ProjDirPath}/..
-    ${SdkRootDirPath}/core/boards/evkmimx8mp
 )
 
 set(CMAKE_MODULE_PATH
@@ -72,10 +71,10 @@ set(CMAKE_MODULE_PATH
     ${SdkRootDirPath}/core/drivers/rdc
     ${SdkRootDirPath}/core/devices/MIMX8ML8
     ${SdkRootDirPath}/core/utilities
-    ${SdkRootDirPath}/core/drivers/igpio
     ${SdkRootDirPath}/core/components/uart
     ${SdkRootDirPath}/core/components/serial_manager
     ${SdkRootDirPath}/core/components/lists
+    ${SdkRootDirPath}/core/drivers/igpio
     ${SdkRootDirPath}/core/drivers/iuart
     ${SdkRootDirPath}/core/utilities/assert
     ${SdkRootDirPath}/core/CMSIS/Core/Include
