@@ -34,14 +34,28 @@ linux$ ./west-venv/bin/west update
 
 ### Build RTOS application
 
-Build the application. This will create `rtos/armgcc/release/armadillo_rtos_demo.{bin,elf}`
+Either GCC or IAR can be used to build this project.
+
+Each project have these targets:
+ - `release`/`debug`: Build for the tightly coupled memory (TCM). The rest of this document assumes 'release' build is used.
+ - `ddr_release`/`ddr_debug`: Binary will be mapped in RAM, `boot_script/boot_ddr.txt` can be used with these binaries.
+This can be necessary if the binary grows too big for TCM.
+ - `flash_release`/`flash_debug`: Not supported for Armadillo, leftover from mcuxpresso examples.
+
+#### Building with GCC
+
+The following command will create `rtos/armgcc/release/armadillo_rtos_demo.{bin,elf}`
 
 ```
 linux$ cd rtos/armgcc
 linux$ ARMGCC_DIR=/usr ./build_release.sh
 ```
 
-(Scripts have been left as is from the mcuxsdk's `examples/evkmimx8mp/multicore_examples/rpmsg_lite_pingpong_rtos`)
+#### Building with IAR
+
+Open the `rtos/iar/armadillo_rtos_demo.eww` workspace file with IAR and build for your target.
+The relase build with create `rtos/iar/Release/armadillo_rtos_demo.bin`
+
 
 ### Build kernel module
 
@@ -65,6 +79,8 @@ linux$ cp dts/armadillo_iotg_g4-rtos-demo.dts "$KERNELDIR/arch/arm64/boot/dts/fr
 linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" freescale/armadillo_iotg_g4-rtos-demo.dtbo
 linux$ cp "$KERNELDIR/arch/arm64/boot/dts/freescale/armadillo_iotg_g4-rtos-demo.dtbo" dts/
 ```
+
+The default overlay build is included for convenience.
 
 ### Install on armadillo
 
@@ -91,7 +107,7 @@ armadillo:~# cp /mnt/armadillo_rtos_demo.bin /boot/
 armadillo:~# persist_file -vp /boot/armadillo_rtos_demo.bin
 ```
 
-2. Copy module to Armadillo
+2. Copy module to Armadillo. The kernel must have been installed previously.
 
 ```
 armadillo:~# mkdir /lib/modules/$(uname -r)/extras
@@ -100,7 +116,7 @@ armadillo:~# depmod
 armadillo:~# persist_file -rv /lib/modules
 ```
 
-3. Enable dtb overlay to reserve memory for cortex M (append to overlays.txt with a space if other dtbos are present)
+3. Enable dtb overlay to reserve memory for cortex M7 (append to overlays.txt with a space if other dtbos are present)
 
 ```
 armadillo:~# cp /mnt/armadillo_iotg_g4-rtos-demo.dtbo /boot/
@@ -109,7 +125,7 @@ fdt_overlays=armadillo_iotg_g4-rtos-demo.dtbo
 armadillo:~# persist_file -vp /boot/armadillo_iotg_g4-rtos-demo.dtbo /boot/overlays.txt
 ```
 
-4. Tell uboot to boot the cortex M:
+4. Tell uboot to boot the cortex M7:
 
 ```
 armadillo:~# cp /mnt/boot.txt /boot/
@@ -155,7 +171,7 @@ armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
 [  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] toggling gpio
 ```
 
-- `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.
+ - `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.
 The 'set log level' and 'toggling gpio' messages above come from the RTOS application through the rpmsg channel.
 
  - `set_gpio` allow controlling GPIO1 pin 15, which can be checked on CON11 pin 24 on Armadillo IoT G4 and Armadillo X2.
@@ -163,25 +179,72 @@ Writing 1 sets it to high and 0 to low.
 
 ## Development
 
+### RTOS description
+
+The `rtos` directory contains a sample FreeRTOS application that:
+ - sets up an rpmsg channel to communicate with linux.
+ - listen to the channel to toggle a GPIO1 pin 15 when requested.
+ - sends any log messages over through the rpmsg channel for debugging.
+
+Here is the breakdown of the files:
+ - `main_remote.c` is the main program:
+   * `main` does the initilization and creates a task.
+   * `app_task` creates the rpmsg channel and listens to it forever.
+   * the "protocol" used to transmit messages is defined in `../common/protocol.h`
+ - `pin_mux.c` contains the used pin definitions to interact with other hardware.
+For example, using CAN will require setting these two pins: `IOMUXC_SAI5_RXD1_CAN1_TX` / `IOMUXC_SAI5_RXD2_CAN1_RX`.
+The Pins Tool at https://mcuxpresso.nxp.com can be used to generate this section (requires an NXP account).
+ - `armgcc/MIMX8ML8xxxxx_cm7_ram.ld` and `iar/MIMX8ML8xxxxx_cm7_ram.icf` contain the linker script used by gcc and IAR respectively, for the release build we support.
+They define:
+   * interrupt handlers and text (binary code) is included in the TCM from 0x0 to 0x20000 (text is 127KB).
+   * data segments are defined in 0x20000000 (`m_data` in TCM, 128KB) and 0x80000000 (`m_data2` in DDR, 16MB). Heap and main stack are in the TCM segment.
+   * These addresses are mapped from physical regions in `board.c`.
+ - FreeRTOS code itself is in `mcuxsdk/rtos/freertos/freertos-kernel`.
+ - CPU specific files are in `mcuxsdk/core/devices/MIMX8ML8`, the exact package model used is MIMX8ML8DVNLZ.
+ - Drivers from NXP are in `mcuxsdk/core/drivers` and `mcuxsdk/middleware/multicore`.
+ - If you did a full clone of the sdk, examples in `mcuxsdk/examples/evkmimx8mp` are mostly compatible.
+
+### Linux module description
+
+The linux module is necessary to interact with the Cortex M7 from linux.
+This module is automatically loaded when the rpmsg named rpmsg-armadillo-demo-channel is created from the Cortex M7 side (`RPMSG_LITE_NS_ANNOUNCE_STRING` defined in `../common/protocol.h`).
+
+On init, this module sends its own version (`VERSION`) to the rpmsg channel and waits for the same version to be echoed back.
+After this initial handshake, it:
+ - creates files in sysfs to allow sending well-defined messages from userspace
+ - keeps listening to the rpmsg channel for log messages
+
+### DTS description
+
+The DTS overlay defines:
+ - Reserved memory for the Cortex M7, so linux does not use it. In particular:
+   * 16MB at offset 0x80000000 as seen in  linker script's `m_data2`
+   * shared buffers for rpmsg and firmware reload (`vdev0vring[0-1]`, `vdevbuffer` and `rsc_table`)
+ - Remote proc node (`imx8mp-cm7`) for control and rpmsg
+ - Disabled components as they are used on the M7 core.
+If you use a hardware component in the RTOS you should make sure that it is not used by linux:
+   * `gpio-hog` can be used to lock a single gpio. One of `input`, `output-low` or `output-high` must be used in this case, and the output variants will write the state once on boot so it might conflict with your application. This can be left out if the GPIO is never used on linux.
+   * components can be disabled e.g. `&flexcan1 { status = "disabled"; };` would disable CAN1 on linux. Note that CAN1 is already disabled by default for the Armadillo IoT G4, so this particular example is not required; you can find enabled components in `arch/arm64/boot/dts/freescale/armadillo_iot_g4.dts` in the linux kernel sources.
+
 ### Update without reboot
 
-After loading the cortex code once through u-boot, one can reload the firmware through the remoteproc interface:
+After loading the cortex M7 code once through u-boot, one can reload the firmware through the remoteproc interface:
 
-1. Stop both cortex M core and the rpmsg module
+1. Stop both cortex M7 core and the rpmsg module
 
 ```
 armadillo:~# echo stop > /sys/class/remoteproc/remoteproc0/state
 armadillo:~# modprobe -r rpmsg_armadillo
 ```
 
-2. Update files as appropriate. Note the firmware used here is the .elf file.
+2. Update files as appropriate. Note the firmware used here is the .elf file, which is only created with the gcc toolchain.
 
 ```
 armadillo:~# cp /mnt/armadillo_rtos_demo.elf /lib/firmware/armadillo_rtos_demo.elf
 armadillo:~# cp /mnt/rpmsg_armadillo.ko  /lib/modules/$(uname -r)/extras
 ```
 
-3. Restart the cortex M core. The kernel module will be loaded automatically when the rpmsg channel is announced.
+3. Restart the cortex M7 core. The kernel module will be loaded automatically when the rpmsg channel is announced.
 
 ```
 armadillo:~# echo armadillo_rtos_demo.elf > /sys/class/remoteproc/remoteproc0/firmware
