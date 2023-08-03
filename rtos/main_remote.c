@@ -138,7 +138,7 @@ static void app_task(void *param)
 				goto out;
 			}
 			log(remote_addr, TYPE_LOG_DEBUG, "toggling gpio");
-			GPIO_WritePinOutput(GPIO2, 8U, msg.data);
+			GPIO_WritePinOutput(GPIO1, 15U, msg.data);
 			break;
 		case TYPE_LOG_SET_LEVEL:
 			log_level = msg.data;
@@ -193,9 +193,9 @@ int main(void)
 	BOARD_BootClockRUN();
 	BOARD_InitDebugConsole();
 
-	/* test done with GPIO2_IO08 */
+	/* demo uses GPIO1_IO15, CON11 pin 24 on Armadillo IoT G4 / X2 */
 	gpio_pin_config_t config = {kGPIO_DigitalOutput, 1, kGPIO_NoIntmode};
-	GPIO_PinInit(GPIO2, 8U, &config);
+	GPIO_PinInit(GPIO1, 15U, &config);
 
 	copyResourceTable();
 

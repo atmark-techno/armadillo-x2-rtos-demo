@@ -158,7 +158,7 @@ armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
 - `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.
 The 'set log level' and 'toggling gpio' messages above come from the RTOS application through the rpmsg channel.
 
-- `set_gpio` allow controlling GPIO2 pin 8, which can be checked on CON12 pin 13 on Armadillo IoT G4.
+ - `set_gpio` allow controlling GPIO1 pin 15, which can be checked on CON11 pin 24 on Armadillo IoT G4 and Armadillo X2.
 Writing 1 sets it to high and 0 to low.
 
 ## Development

@@ -4,7 +4,7 @@
  *
  * This file is based on armadillo_iotg_g4-rpmsg.dts as of atmark's
  * linux 5.10.186-r0, with the following changes
- *  - GPIO2_IO08 is locked
+ *  - GPIO1_IO15 is locked
  */
 
 /dts-v1/;
@@ -75,11 +75,12 @@
 	status = "disabled";
 };
 
-&gpio2 {
-	// we don't care about the value, just want to reserve the pin
+&gpio1 {
+	// reserve the pin
 	lock_rtos_gpios {
-		//gpio-hog;
-		gpios = <2 GPIO_ACTIVE_HIGH>;
+		gpio-hog;
+		gpios = <15 GPIO_ACTIVE_HIGH>;
 		line-name = "rtos_gpio";
+		output-low;
 	};
 };
