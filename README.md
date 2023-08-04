@@ -6,29 +6,34 @@
 
 We use the NXP mcuxpresso sdk for this example.
 
+Commands below are listed with either a `ATDE$` or `armadillo#` prompt. The ATDE virtual machine can be downloaded on the [Armadillo site (ja)](https://armadillo.atmark-techno.com/resources/software/atde/atde-v9).
+The armadillo-x2-rtos-demo clone directory has been shortened to "demo" for brievty.
+
 First, install requirements (~200MB download, ~2GB on disk)
 
 ```
-linux$ apt install gcc-arm-none-eabi python3-virtualenv
-linux$ virtualenv west-venv
-linux$ ./west-venv/bin/pip install west
+ATDE$ apt install gcc-arm-none-eabi cmake python3-virtualenv
+ATDE$ git clone https://github.com/atmark-techno/armadillo-x2-rtos-demo
+ATDE$ cd armadillo-x2-rtos-demo
+ATDE demo$ virtualenv west-venv
+ATDE demo$ ./west-venv/bin/pip install west
 ```
 
 Then you can either install the whole mcuxpresso sdk, or just required components for the example. Using the full repository is recommended for development (to e.g. add other drivers)
 
-Full repository (~1GB download, ~7GB on disk):
+Full repository (~400MB download, ~7GB on disk):
 
 ```
-linux$ ./west-venv/bin/west init -m https://github.com/nxp-mcuxpresso/mcux-sdk mcuxsdk
-linux$ cd mcuxsdk
-linux$ ../west-venv/bin/west update
+ATDE demo$ ./west-venv/bin/west init -m https://github.com/nxp-mcuxpresso/mcux-sdk mcuxsdk
+ATDE demo$ cd mcuxsdk
+ATDE mcuxsdk$ ../west-venv/bin/west update --narrow -o=--depth=1
 ```
 
-Minimal repository (500MB download, 1.3GB on disk):
+Minimal repository (50MB download, 900MB on disk):
 
 ```
-linux$ ./west-venv/bin/west init -l west
-linux$ ./west-venv/bin/west update
+ATDE demo$ ./west-venv/bin/west init -l west
+ATDE demo$ ./west-venv/bin/west update --narrow -o=--depth=1
 ```
 
 
@@ -48,8 +53,18 @@ This can be necessary if the code (.text) section grows bigger than 127KB.
 The following command will create `rtos/armgcc/release/armadillo_rtos_demo.{bin,elf}`
 
 ```
-linux$ cd rtos/armgcc
-linux$ ARMGCC_DIR=/usr ./build_release.sh
+ATDE demo$ cd rtos/armgcc
+ATDE armgcc$ ARMGCC_DIR=/usr ./build_release.sh
+[...]
+[100%] Linking C executable release/armadillo_rtos_demo.elf
+Memory region         Used Size  Region Size  %age Used
+    m_interrupts:         680 B         1 KB     66.41%
+          m_text:       21296 B       127 KB     16.38%
+          m_data:       43944 B       128 KB     33.53%
+         m_data2:          0 GB        16 MB      0.00%
+[100%] Built target armadillo_rtos_demo.elf
+ATDE armgcc$ ls release
+armadillo_rtos_demo.bin*  armadillo_rtos_demo.elf*
 ```
 
 #### Building with IAR
@@ -61,28 +76,47 @@ The relase build with create `rtos/iar/Release/armadillo_rtos_demo.bin`
 ### Build linux kernel module
 
 1. Download linux kernel from https://armadillo.atmark-techno.com/resources/software/armadillo-iot-g4/linux-kernel
+
 2. Extract and build linux to perform compatibility check on module loading:
 
 ```
-linux$ sudo apt install crossbuild-essential-arm64 bison flex \
+ATDE$ sudo apt install crossbuild-essential-arm64 bison flex \
     python3-pycryptodome python3-pyelftools zlib1g-dev libssl-dev \
     bc firmware-misc-nonfree
-linux$ tar xf linux-at-x2-<version>.tar
-linux$ tar xf linux-at-x2-<version>/linux-<version>.tar.gz
-linux$ cd linux-<version>
-linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make x2_defconfig
-linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -j9
+ATDE$ tar xf linux-at-x2-<version>.tar
+ATDE$ tar xf linux-at-x2-<version>/linux-<version>.tar.gz
+ATDE$ cd linux-<version>
+ATDE linux-<version>$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make x2_defconfig
+ATDE linux-<version>$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -j9
 ```
 
-If armadillo does not use this linux kernel, also install it as described in
-https://manual.atmark-techno.com/armadillo-iot-g4/armadillo-iotg-g4_product_manual_ja-1.20.0/ch10.html#sct.build-kernel
+3. Check that the linux kernel running on armadillo is the same as the version we built.
+The build directory is in the form `linux-5.10-5.10.<minor>-r<release>`, check that `minor` and `release` match below:
 
-3. Build module. KERNELDIR is the directory of the linux kernel we built.
+```
+armadillo:~# uname -r
+5.10.<minor>-<release>-at
+```
+
+If the versions do not match, update armadillo (or install the kernel as described in the [reference manual (ja)](https://manual.atmark-techno.com/armadillo-iot-g4/armadillo-iotg-g4_product_manual_ja-1.20.0/ch10.html#sct.build-kernel)
+
+```
+armadillo:~# swupdate -d '-u https://download.atmark-techno.com/armadillo-x2/image/baseos-x2-latest.swu'
+[...]
+[INFO ] : SWUPDATE running :  [install_single_image] : Installing baseos-x2-<version>
+[INFO ] : SWUPDATE running :  [install_single_image] : Installing post_script
+[INFO ] : SWUPDATE running :  [read_lines_notify] : Removing unused containers
+[INFO ] : SWUPDATE running :  [read_lines_notify] : swupdate triggering reboot!
+```
+
+4. Build module. KERNELDIR is the directory of the linux kernel we built.
 This will create `linux/rpmsg_armadillo.ko`
 
 ```
-linux$ KERNELDIR=$HOME/linux-<version>
-linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" M="$PWD/linux" modules
+ATDE$ KERNELDIR=$HOME/linux-<version>
+ATDE demo$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" M="$PWD/linux" modules
+ATDE demo$ ls linux/rpmsg_armadillo.ko
+ATDE/rpmsg_armadillo.ko
 ```
 
 ### Build DTB overlay
@@ -92,9 +126,11 @@ This example works as is with the `armadillo_iotg_g4-rpmsg.dtbo` overlay as of l
 The dtbo can be built as follow. This will create `dts/armadillo_iot_g4-rtos-demo.dtbo` (after copy).
 
 ```
-linux$ cp dts/armadillo_iotg_g4-rtos-demo.dts "$KERNELDIR/arch/arm64/boot/dts/freescale/"
-linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" freescale/armadillo_iotg_g4-rtos-demo.dtbo
-linux$ cp "$KERNELDIR/arch/arm64/boot/dts/freescale/armadillo_iotg_g4-rtos-demo.dtbo" dts/
+ATDE demo$ cp dts/armadillo_iotg_g4-rtos-demo.dts "$KERNELDIR/arch/arm64/boot/dts/freescale/"
+ATDE demo$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" freescale/armadillo_iotg_g4-rtos-demo.dtbo
+ATDE demo$ cp "$KERNELDIR/arch/arm64/boot/dts/freescale/armadillo_iotg_g4-rtos-demo.dtbo" dts/
+ATDE demo$ ls dts/armadillo_iotg_g4-rtos-demo.dtbo
+armadillo_iotg_g4-rtos-demo.dtbo
 ```
 
 The default overlay build is included for convenience.
@@ -103,29 +139,43 @@ The default overlay build is included for convenience.
 
 Either copy files manually or generate the swu and install it.
 
-#### swu method
+#### SWU method
+
+Updates on Armadillo Base OS are distributed through SWU files, generated with [mkswu](https://github.com/atmark-techno/mkswu).
+Please refer to the [reference manual (ja)](https://manual.atmark-techno.com/armadillo-iot-g4/armadillo-iotg-g4_product_manual_ja-1.20.0/ch10.html#sct.mkswu) for its initial configuration.
 
 `rtos.desc` contains an example mkswu description to install the necessary files to run.
 It does not check the kernel version that was used to build the module, so if the module does not load please install the kernel built previously and redo this step.
 
 ```
-linux$ mkswu --update-version rtos.desc
-linux$ mkswu rtos.desc
+ATDE demo$ mkswu --update-version rtos.desc
+ATDE demo$ mkswu rtos.desc
 ```
 
 rtos.swu can then be installed.
 
 #### manual method
 
-1. Copy `rtos/armgcc/release/armadillo_rtos_demo.bin` to Armadillo. We need the .bin file for loading through u-boot.
+1. Copy files we will need on a USB drive:
+
+```
+ATDE demo$ sudo mount /dev/sda1 /mnt
+ATDE demo$ cp rtos/*/*/armadillo_rtos_demo.* /mnt
+ATDE demo$ cp linux/rpmsg_armadillo.ko /mnt
+ATDE demo$ cp dts/armadillo_iotg_g4-rtos-demo.dtbo /mnt
+ATDE demo$ cp boot_script/boot.txt /mnt
+ATDE demo$ umount /mnt
+```
+
+2. Copy `rtos/armgcc/release/armadillo_rtos_demo.bin` to Armadillo. We need the .bin file for loading through u-boot.
 
 ```
 armadillo:~# mount /dev/sda1 /mnt
 armadillo:~# cp /mnt/armadillo_rtos_demo.bin /boot/
-armadillo:~# persist_file -vp /boot/armadillo_rtos_demo.bin
+armadillo:~# persist_file -v /boot/armadillo_rtos_demo.bin
 ```
 
-2. Copy module to Armadillo. If the kernel is not compatible with the module, the modprobe command will fail.
+3. Copy module to Armadillo. If the kernel is not compatible with the module, the modprobe command will fail.
 
 ```
 armadillo:~# mkdir /lib/modules/$(uname -r)/extras
@@ -135,24 +185,38 @@ armadillo:~# modprobe rpmsg_armadillo
 armadillo:~# persist_file -rv /lib/modules
 ```
 
-3. Enable dtb overlay to reserve memory for cortex M7 (append to overlays.txt with a space if other dtbos are present)
+4. Enable dtb overlay to reserve memory for cortex M7 (append to overlays.txt with a space if other dtbos are present)
 
 ```
 armadillo:~# cp /mnt/armadillo_iotg_g4-rtos-demo.dtbo /boot/
 armadillo:~# vi /boot/overlays.txt
 fdt_overlays=armadillo_iotg_g4-rtos-demo.dtbo
-armadillo:~# persist_file -vp /boot/armadillo_iotg_g4-rtos-demo.dtbo /boot/overlays.txt
+armadillo:~# persist_file -v /boot/armadillo_iotg_g4-rtos-demo.dtbo /boot/overlays.txt
 ```
 
-4. Tell uboot to boot the cortex M7:
+5. Tell uboot to boot the cortex M7:
 
 ```
 armadillo:~# cp /mnt/boot.txt /boot/
 armadillo:~# mkbootscr /boot/boot.txt
-armadillo:~# persist_file -vp /boot/boot.*
+armadillo:~# persist_file -v /boot/boot.*
 ```
 
-5. Reboot
+6. Freeze the kernel version and newly installed files.
+We've saved the files from the in-memory overlayfs to the eMMC with
+`persist_file`, but files will be lost after an OS upgrade.
+Adding them to `/etc/swupdate_preserve_files` will freeze them
+across updates.
+
+```
+armadillo:~# vi /etc/swupdate_preserve_files
+# add the following two lines
+POST /boot
+POST /lib/modules
+armadillo:~# persist_file -v /etc/swupdate_preserve_files
+```
+
+7. Reboot
 
 ```
 armadillo:~# reboot
@@ -182,10 +246,11 @@ armadillo:~# cd /sys/class/remoteproc/remoteproc0/remoteproc0\#vdev0buffer/virti
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# ls set*
 set_gpio  set_loglevel
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 0 > set_loglevel
-armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# dmesg | tail
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# dmesg | tail -n 2
 [  159.965872] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting loglevel to 0
 [  159.966227] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] set log level
 armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
+armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# dmesg | tail -n 2
 [  181.364096] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: setting gpio to 1
 [  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] toggling gpio
 ```
@@ -255,7 +320,8 @@ If you use a hardware component in the RTOS you should make sure that it is not 
 
 ### Update without reboot
 
-After loading the cortex M7 code once through u-boot, one can reload the firmware through the remoteproc interface:
+After loading the cortex M7 code once through u-boot, one can reload the firmware through the remoteproc interface.
+Note this is only used for testing and changes here will not persist after reboot.
 
 1. Stop both cortex M7 core and the rpmsg module
 
