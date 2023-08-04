@@ -18,16 +18,14 @@ echo "Using $rtos_bin"
 swdesc_files --dest /boot "$rtos_bin"
 	
 # install the kernel module
-modinfo=$(PATH="$PATH:/usr/sbin" command -v modinfo) \
-	|| error "Could not find modinfo command to determine module install path"
-kver="$("$modinfo" -F vermagic "$KMOD")" \
-        && [ -n "$kver" ] \
-	|| error "Could not get "$KMOD" module version"
-kver="${kver%% *}"
+# the kernel version used is the currently running version, so
+# linux should not be updated in the same SWU. If that is the
+# case just set kver directly.
 swdesc_exec "$KMOD" \
-	"mkdir -p /lib/modules/$kver/extras" \
-	"mv \$1 /lib/modules/$kver/extras/${KMOD##*/}" \
-	"depmod $kver"
+	'kver=$(uname -r)' \
+	'mkdir -p /lib/modules/$kver/extras' \
+	"mv \$1 /lib/modules/\$kver/extras/${KMOD##*/}" \
+	'depmod $kver'
 
 # copy and enable dtb overlay
 swdesc_files --dest /boot "$DTBO"
@@ -40,11 +38,10 @@ swdesc_exec "$BOOT" \
 	'mkbootscr /boot/boot.txt'
 
 # update preserve_files list
-# note all kernel modules are already preserved if the kernel had
-# been installed properly, so this is not done here.
 swdesc_script "$SCRIPT_DIR/examples/update_preserve_files.sh" -- \
 	"/boot/${RTOS_BIN##*/}" \
 	"/boot/${DTBO##*/}" \
 	"/boot/boot.txt" \
-	"/boot/boot.scr"
-
+	"/boot/boot.scr" \
+        "POST /boot" \
+        "POST /lib/modules"
