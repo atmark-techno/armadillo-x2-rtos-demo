@@ -38,8 +38,9 @@ Either GCC or IAR can be used to build this project.
 
 Each project have these targets:
  - `release`/`debug`: Build for the tightly coupled memory (TCM). The rest of this document assumes 'release' build is used.
- - `ddr_release`/`ddr_debug`: Binary will be mapped in RAM, `boot_script/boot_ddr.txt` can be used with these binaries.
-This can be necessary if the binary grows too big for TCM.
+ - `ddr_release`/`ddr_debug`: Binary will be mapped in RAM, without using TCM.
+`boot_script/boot_ddr.txt` can be used with these binaries.
+This can be necessary if the code (.text) section grows bigger than 127KB.
  - `flash_release`/`flash_debug`: Not supported for Armadillo, leftover from mcuxpresso examples.
 
 #### Building with GCC
@@ -57,18 +58,34 @@ Open the `rtos/iar/armadillo_rtos_demo.eww` workspace file with IAR and build fo
 The relase build with create `rtos/iar/Release/armadillo_rtos_demo.bin`
 
 
-### Build kernel module
+### Build linux kernel module
 
-1. Download kernel from https://armadillo.atmark-techno.com/resources/software/armadillo-iot-g4/linux-kernel
-2. Extract, build & install kernel https://manual.atmark-techno.com/armadillo-iot-g4/armadillo-iotg-g4_product_manual_ja-1.20.0/ch10.html#sct.build-kernel
-3. Build module. KERNELDIR is an example. This will create `linux/rpmsg_armadillo.ko`
+1. Download linux kernel from https://armadillo.atmark-techno.com/resources/software/armadillo-iot-g4/linux-kernel
+2. Extract and build linux to perform compatibility check on module loading:
 
 ```
-linux$ KERNELDIR=$HOME/linux-5.10-5.10.186-r0
+linux$ sudo apt install crossbuild-essential-arm64 bison flex \
+    python3-pycryptodome python3-pyelftools zlib1g-dev libssl-dev \
+    bc firmware-misc-nonfree
+linux$ tar xf linux-at-x2-<version>.tar
+linux$ tar xf linux-at-x2-<version>/linux-<version>.tar.gz
+linux$ cd linux-<version>
+linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make x2_defconfig
+linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -j9
+```
+
+If armadillo does not use this linux kernel, also install it as described in
+https://manual.atmark-techno.com/armadillo-iot-g4/armadillo-iotg-g4_product_manual_ja-1.20.0/ch10.html#sct.build-kernel
+
+3. Build module. KERNELDIR is the directory of the linux kernel we built.
+This will create `linux/rpmsg_armadillo.ko`
+
+```
+linux$ KERNELDIR=$HOME/linux-<version>
 linux$ CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make -C "$KERNELDIR" M="$PWD/linux" modules
 ```
 
-### Build DTS overlay
+### Build DTB overlay
 
 This example works as is with the `armadillo_iotg_g4-rpmsg.dtbo` overlay as of linux 5.10.186-r0, but for demonstration purpose we also locked the GPIO we used on the RTOS side to make sure it cannot be used from linux.
 
@@ -88,7 +105,8 @@ Either copy files manually or generate the swu and install it.
 
 #### swu method
 
-`rtos.desc` contains an example mkswu description to install the necessary files to run. It assumes the kernel has already been updated before in the "Build kernel module" step.
+`rtos.desc` contains an example mkswu description to install the necessary files to run.
+It does not check the kernel version that was used to build the module, so if the module does not load please install the kernel built previously and redo this step.
 
 ```
 linux$ mkswu --update-version rtos.desc
@@ -107,12 +125,13 @@ armadillo:~# cp /mnt/armadillo_rtos_demo.bin /boot/
 armadillo:~# persist_file -vp /boot/armadillo_rtos_demo.bin
 ```
 
-2. Copy module to Armadillo. The kernel must have been installed previously.
+2. Copy module to Armadillo. If the kernel is not compatible with the module, the modprobe command will fail.
 
 ```
 armadillo:~# mkdir /lib/modules/$(uname -r)/extras
-armadillo:~# cp /mnt/rpmsg_armadillo.ko  /lib/modules/$(uname -r)/extras/
+armadillo:~# cp /mnt/rpmsg_armadillo.ko /lib/modules/$(uname -r)/extras/
 armadillo:~# depmod
+armadillo:~# modprobe rpmsg_armadillo
 armadillo:~# persist_file -rv /lib/modules
 ```
 
@@ -143,7 +162,7 @@ armadillo:~# reboot
 
 If install succeeded, you should have FreeRTOS running on the cortex M7, and a module driver on linux allowing to communicate with the RTOS.
 
-1. dmesg should contain informations about rpmsg and the module, such as:
+1. `dmesg` should contain informations about rpmsg and the module, such as:
 
 ```
 [    0.048219] imx rpmsg driver is registered.
@@ -171,8 +190,11 @@ armadillo:virtio0.rpmsg-armadillo-demo-channel.-1.30# echo 1 > set_gpio
 [  181.364145] rpmsg_armadillo virtio0.rpmsg-armadillo-demo-channel.-1.30: [remote] toggling gpio
 ```
 
+In this demo,
+
  - `set_loglevel` allows controlling how much messages are sent from the RTOS application to linux, for debugging.
-The 'set log level' and 'toggling gpio' messages above come from the RTOS application through the rpmsg channel.
+Messages prefixed with `[remote]` above come from the RTOS application through the rpmsg channel.
+0 prints all messages and 4 prints none.
 
  - `set_gpio` allow controlling GPIO1 pin 15, which can be checked on CON11 pin 24 on Armadillo IoT G4 and Armadillo X2.
 Writing 1 sets it to high and 0 to low.
@@ -200,9 +222,13 @@ They define:
    * data segments are defined in 0x20000000 (`m_data` in TCM, 128KB) and 0x80000000 (`m_data2` in DDR, 16MB). Heap and main stack are in the TCM segment.
    * These addresses are mapped from physical regions in `board.c`.
  - FreeRTOS code itself is in `mcuxsdk/rtos/freertos/freertos-kernel`.
- - CPU specific files are in `mcuxsdk/core/devices/MIMX8ML8`, the exact package model used is MIMX8ML8DVNLZ.
+ - CPU specific files are in `mcuxsdk/core/devices/MIMX8ML8`, the exact package model used is `MIMX8ML8DVNLZ`.
  - Drivers from NXP are in `mcuxsdk/core/drivers` and `mcuxsdk/middleware/multicore`.
  - If you did a full clone of the sdk, examples in `mcuxsdk/examples/evkmimx8mp` are mostly compatible.
+
+
+Applications other than FreeRTOS can be used on the Cortex M7, but if communication with linux is desirable we recommend rpmsg for transmission.
+The code at https://github.com/OpenAMP/open-amp can be used as a base for bare metal applications.
 
 ### Linux module description
 
@@ -212,13 +238,14 @@ This module is automatically loaded when the rpmsg named rpmsg-armadillo-demo-ch
 On init, this module sends its own version (`VERSION`) to the rpmsg channel and waits for the same version to be echoed back.
 After this initial handshake, it:
  - creates files in sysfs to allow sending well-defined messages from userspace
+The files are created through the `rpmsg_armadillo_attrs` list, where each file has its own callbacks generated with the `DEVICE_ATTR_WO` macro. `DEVICE_ATTR_RO` and `DEVICE_ATTR_RW` can also be used for readable and read-write files, in which case they also need to implement a `show` callback.
  - keeps listening to the rpmsg channel for log messages
 
 ### DTS description
 
-The DTS overlay defines:
+The DTB overlay defines:
  - Reserved memory for the Cortex M7, so linux does not use it. In particular:
-   * 16MB at offset 0x80000000 as seen in  linker script's `m_data2`
+   * 16MB at offset 0x80000000 as seen in linker script's `m_data2`
    * shared buffers for rpmsg and firmware reload (`vdev0vring[0-1]`, `vdevbuffer` and `rsc_table`)
  - Remote proc node (`imx8mp-cm7`) for control and rpmsg
  - Disabled components as they are used on the M7 core.
@@ -241,7 +268,7 @@ armadillo:~# modprobe -r rpmsg_armadillo
 
 ```
 armadillo:~# cp /mnt/armadillo_rtos_demo.elf /lib/firmware/armadillo_rtos_demo.elf
-armadillo:~# cp /mnt/rpmsg_armadillo.ko  /lib/modules/$(uname -r)/extras
+armadillo:~# cp /mnt/rpmsg_armadillo.ko /lib/modules/$(uname -r)/extras
 ```
 
 3. Restart the cortex M7 core. The kernel module will be loaded automatically when the rpmsg channel is announced.
