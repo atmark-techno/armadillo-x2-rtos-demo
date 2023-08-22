@@ -6,7 +6,7 @@
 
 このデモは NXP が提供している MCUXpresso の SDK を使用しています。
 
-以下のコマンドは `ATDE$` か `armadillo#` のプロンプトで記載しています。ABOS の仮想マシンは [Armadillo サイト](https://armadillo.atmark-techno.com/resources/software/atde/atde-v9) に取得できます。
+以下のコマンドは `ATDE$` か `armadillo#` のプロンプトで記載しています。ATDE の仮想マシンは [Armadillo サイト](https://armadillo.atmark-techno.com/resources/software/atde/atde-v9) に取得できます。
 「demo」のディレクトリ名はクローンした armadillo-x2-rtos-demo のディレクトリです。
 
 以下のコマンドで、環境構築に必要なパッケージとツールをインストールします（~200MB ダウンロード、~2GB ディスクスペース）
