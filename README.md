@@ -7,7 +7,7 @@
 We use the NXP mcuxpresso sdk for this example.
 
 Commands below are listed with either a `ATDE$` or `armadillo#` prompt. The ATDE virtual machine can be downloaded on the [Armadillo site (ja)](https://armadillo.atmark-techno.com/resources/software/atde/atde-v9).
-The armadillo-x2-rtos-demo clone directory has been shortened to "demo" for brievty.
+The armadillo-x2-rtos-demo clone directory has been shortened to "demo" in prompts for brievty.
 
 First, install requirements (~200MB download, ~2GB on disk)
 
