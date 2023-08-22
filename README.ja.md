@@ -81,6 +81,7 @@ armadillo_rtos_demo.bin*  armadillo_rtos_demo.elf*
 https://armadillo.atmark-techno.com/resources/software/armadillo-iot-g4/linux-kernel
 
 2. Linux を展開し、Module.symvers を生成するためにビルドします。
+ビルドは、Linux カーネルとモジュールのバージョンに不一致が生じた場合、モジュールのロードに失敗する為です。
 
 ```
 ATDE$ sudo apt install crossbuild-essential-arm64 bison flex \
