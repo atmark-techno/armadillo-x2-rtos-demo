@@ -367,6 +367,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -1461,6 +1462,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -2555,6 +2557,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -3648,6 +3651,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -4742,6 +4746,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -5836,6 +5841,7 @@
           <state>$PROJ_DIR$/../../mcuxsdk/core/components/uart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart</state>
           <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/igpio</state>
+          <state>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi</state>
         </option>
         <option>
           <name>CCStdIncCheck</name>
@@ -6879,6 +6885,12 @@
     </file>
     <file>
       <name>$PROJ_DIR$/../../mcuxsdk/core/drivers/iuart/fsl_uart.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi/fsl_ecspi.h</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$/../../mcuxsdk/core/drivers/ecspi/fsl_ecspi.c</name>
     </file>
   </group>
   <group>

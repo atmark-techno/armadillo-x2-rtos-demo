@@ -11,6 +11,9 @@
 // data = 0 or 1 (unset or set)
 #define TYPE_GPIO 0x1
 
+// trigger sending spi message
+#define TYPE_SPI 0x2
+
 // rtos cannot use serial so logs are send over rpmsg
 // linux -> rtos: set log level
 // data = level (0 = debug+, 1 = info+, 2 = warn+, 3 = nothing)

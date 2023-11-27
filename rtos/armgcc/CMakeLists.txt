@@ -77,6 +77,7 @@ set(CMAKE_MODULE_PATH
     ${SdkRootDirPath}/core/drivers/igpio
     ${SdkRootDirPath}/core/drivers/iuart
     ${SdkRootDirPath}/core/utilities/assert
+    ${SdkRootDirPath}/core/drivers/ecspi
     ${SdkRootDirPath}/core/CMSIS/Core/Include
     ${SdkRootDirPath}/core/utilities/misc_utilities
 )
@@ -121,6 +122,8 @@ include(driver_iuart)
 include(device_startup)
 
 include(utility_assert)
+
+include(driver_ecspi)
 
 include(middleware_freertos-kernel_extension)
 

@@ -59,6 +59,25 @@ void BOARD_InitPins(void) {                                /*!< Function assigne
                         IOMUXC_SW_PAD_CTL_PAD_DSE(3U) |
                         IOMUXC_SW_PAD_CTL_PAD_PUE_MASK |
                         IOMUXC_SW_PAD_CTL_PAD_PE_MASK);
+
+    // SPI
+    IOMUXC_SetPinMux(IOMUXC_ECSPI1_MISO_ECSPI1_MISO, 0U);
+    IOMUXC_SetPinConfig(IOMUXC_ECSPI1_MISO_ECSPI1_MISO,
+                        IOMUXC_SW_PAD_CTL_PAD_DSE(2U) |
+                        IOMUXC_SW_PAD_CTL_PAD_HYS_MASK);
+    IOMUXC_SetPinMux(IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI, 0U);
+    IOMUXC_SetPinConfig(IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI,
+                        IOMUXC_SW_PAD_CTL_PAD_DSE(2U) |
+                        IOMUXC_SW_PAD_CTL_PAD_HYS_MASK);
+    IOMUXC_SetPinMux(IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK, 0U);
+    IOMUXC_SetPinConfig(IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK,
+                        IOMUXC_SW_PAD_CTL_PAD_DSE(2U) |
+                        IOMUXC_SW_PAD_CTL_PAD_HYS_MASK);
+    IOMUXC_SetPinMux(IOMUXC_ECSPI1_SS0_ECSPI1_SS0, 0U);
+    IOMUXC_SetPinConfig(IOMUXC_ECSPI1_SS0_ECSPI1_SS0,
+                        IOMUXC_SW_PAD_CTL_PAD_DSE(2U) |
+                        IOMUXC_SW_PAD_CTL_PAD_HYS_MASK);
+
 }
 
 /***********************************************************************************************************************

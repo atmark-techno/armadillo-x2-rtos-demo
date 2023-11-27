@@ -30,6 +30,7 @@ struct rpmsg_armadillo {
 	uint32_t length;
 };
 
+// write 0 or 1 to set gpio off or on
 static ssize_t set_gpio_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
 {
@@ -57,6 +58,7 @@ static ssize_t set_gpio_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_WO(set_gpio);
 
+// write int between 0 and 4 to set remote log level
 static ssize_t set_loglevel_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
@@ -85,8 +87,31 @@ static ssize_t set_loglevel_store(struct device *dev,
 }
 static DEVICE_ATTR_WO(set_loglevel);
 
+// write anything to trigger sending SPI message if built with SPI_MASTER
+static ssize_t spi_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+	int ret;
+	struct msg msg = {
+		.type = TYPE_SPI,
+	};
+
+	dev_info(dev, "triggeing spi message\n");
+
+	ret = rpmsg_send(rpdev->ept, &msg, sizeof(msg));
+	if (ret) {
+		dev_err(&rpdev->dev, "rpmsg_send failed: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+static DEVICE_ATTR_WO(spi);
+
 static struct attribute *rpmsg_armadillo_attrs[] = {
-	&dev_attr_set_gpio.attr, &dev_attr_set_loglevel.attr, NULL
+	&dev_attr_set_gpio.attr, &dev_attr_set_loglevel.attr,
+	&dev_attr_spi.attr, NULL
 };
 
 static struct attribute_group rpmsg_armadillo_attrgroup = {

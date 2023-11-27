@@ -17,6 +17,7 @@
 #include "clock_config.h"
 #include "board.h"
 #include "fsl_debug_console.h"
+#include "fsl_ecspi.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -26,22 +27,32 @@
 #define RPMSG_LITE_SHMEM_BASE (VDEV0_VRING_BASE)
 
 #define APP_TASK_STACK_SIZE (256U)
+#define SPI_TASK_STACK_SIZE (256U)
 #ifndef LOCAL_EPT_ADDR
 #define LOCAL_EPT_ADDR (30U)
 #endif
 
 #include "../common/protocol.h"
 
+// enable either spi slave or master code
+//#define SPI_SLAVE
+#define SPI_MASTER
+#define SPI_TRANSFER_SIZE 64U
+
 /*******************************************************************************
  * Code
  ******************************************************************************/
 static TaskHandle_t app_task_handle = NULL;
+#ifdef SPI_SLAVE
+static TaskHandle_t spi_task_handle = NULL;
+#endif
 
 static struct rpmsg_lite_instance *volatile rpmsg = NULL;
 
 static struct rpmsg_lite_endpoint *volatile rpmsg_endpoint = NULL;
 static volatile rpmsg_queue_handle rpmsg_queue = NULL;
 static volatile uint32_t rpmsg_remote_addr;
+static volatile bool rpmsg_ready = false;
 
 // default to info -- we compare diff to debug.
 static int log_level = TYPE_LOG_INFO - TYPE_LOG_DEBUG;
@@ -52,6 +63,13 @@ void app_destroy_task(void)
 		vTaskDelete(app_task_handle);
 		app_task_handle = NULL;
 	}
+
+#ifdef SPI_SLAVE
+	if (spi_task_handle) {
+		vTaskDelete(spi_task_handle);
+		spi_task_handle = NULL;
+	}
+#endif
 
 	if (rpmsg_endpoint) {
 		rpmsg_lite_destroy_ept(rpmsg, rpmsg_endpoint);
@@ -127,6 +145,48 @@ static void app_task(void *param)
 	(void)rpmsg_lite_send(rpmsg, rpmsg_endpoint, rpmsg_remote_addr,
 			      (char *)&msg, sizeof(msg), RL_BLOCK);
 
+// spi master code
+// mostly based on example from mcuxsdk:
+// mcuxsdk/examples/evkmimx8mp/driver_examples/ecspi/polling_b2b_transfer/master/ecspi_polling_b2b_transfer_master.c
+#ifdef SPI_MASTER
+	/* clock init */
+#define ECSPI_MASTER_CLK_FREQ                           \
+	(CLOCK_GetPllFreq(kCLOCK_SystemPll1Ctrl) /      \
+	 (CLOCK_GetRootPreDivider(kCLOCK_RootEcspi1)) / \
+	 (CLOCK_GetRootPostDivider(kCLOCK_RootEcspi1)))
+	CLOCK_SetRootMux(
+		kCLOCK_RootEcspi1,
+		kCLOCK_EcspiRootmuxSysPll1); /* Set ECSPI1 source to SYSTEM PLL1 800MHZ */
+	CLOCK_SetRootDivider(kCLOCK_RootEcspi1, 2U,
+			     5U); /* Set root clock to 800MHZ / 10 = 80MHZ */
+
+	ecspi_master_config_t masterConfig;
+	ecspi_transfer_t masterXfer;
+	uint32_t masterData[SPI_TRANSFER_SIZE];
+	int counter = 0, i;
+#define TRANSFER_BAUDRATE 500000U /*! Transfer baudrate - 500k */
+
+	/* Master config:
+	 * masterConfig.channel = kECSPI_Channel0;
+	 * masterConfig.burstLength = 8;
+	 * masterConfig.samplePeriodClock = kECSPI_spiClock;
+	 * masterConfig.baudRate_Bps = TRANSFER_BAUDRATE;
+	 * masterConfig.chipSelectDelay = 0;
+	 * masterConfig.samplePeriod = 0;
+	 * masterConfig.txFifoThreshold = 1;
+	 * masterConfig.rxFifoThreshold = 0;
+	 */
+	ECSPI_MasterGetDefaultConfig(&masterConfig);
+	// burstLength should be at least the size of a byte to not lose data per word
+	masterConfig.burstLength = SPI_TRANSFER_SIZE * 32;
+	masterConfig.baudRate_Bps = TRANSFER_BAUDRATE;
+
+	ECSPI_MasterInit(ECSPI1, &masterConfig, ECSPI_MASTER_CLK_FREQ);
+
+	log(TYPE_LOG_INFO, "spi master ready");
+#endif
+
+	rpmsg_ready = true;
 	while (true) {
 		(void)rpmsg_queue_recv(rpmsg, rpmsg_queue,
 				       (uint32_t *)&rpmsg_remote_addr,
@@ -145,6 +205,49 @@ static void app_task(void *param)
 		case TYPE_LOG_SET_LEVEL:
 			log_level = msg.data;
 			log(TYPE_LOG_INFO, "set log level");
+			break;
+		case TYPE_SPI:
+#ifdef SPI_MASTER
+			log(TYPE_LOG_INFO, "Sending spi message...");
+
+			// generate some data and send it
+			for (i = 0; i < SPI_TRANSFER_SIZE - 2; i++) {
+				// ensure counter is 4 digits so we get one digit per int
+				if (counter > 9999)
+					counter = 0;
+				sprintf((char *)(masterData + i), "%4d",
+					counter++);
+			}
+			masterData[SPI_TRANSFER_SIZE - 1] = 0;
+
+			masterXfer.txData = masterData;
+			masterXfer.rxData = NULL;
+			masterXfer.dataSize = SPI_TRANSFER_SIZE;
+			masterXfer.channel = kECSPI_Channel0;
+			ECSPI_MasterTransferBlocking(ECSPI1, &masterXfer);
+
+			log(TYPE_LOG_INFO, "Done sending, receiving...");
+
+			// wait a bit for slave to prepare data to send back
+			SDK_DelayAtLeastUs(
+				20000U, SDK_DEVICE_MAXIMUM_CPU_CLOCK_FREQUENCY);
+
+			// read data back and print it
+			memset(masterData, 0, sizeof(masterData));
+			masterXfer.txData = NULL;
+			masterXfer.rxData = masterData;
+			masterXfer.dataSize = SPI_TRANSFER_SIZE;
+			masterXfer.channel = kECSPI_Channel0;
+			ECSPI_MasterTransferBlocking(ECSPI1, &masterXfer);
+
+			log(TYPE_LOG_INFO, "Done receiving:");
+			// truncate end to be safe for log(), as that uses strlen
+			masterData[SPI_TRANSFER_SIZE - 1] = 0;
+			log(TYPE_LOG_INFO, (char *)masterData);
+
+#else
+			log(TYPE_LOG_INFO, "spi not compiled in");
+#endif
 			break;
 		default:
 			log(TYPE_LOG_WARN, "bad type, stopping loop");
@@ -165,15 +268,102 @@ out:
 		;
 }
 
+// spi slave code
+// mostly based on example from mcuxsdk:
+// mcuxsdk/examples/evkmimx8mp/driver_examples/ecspi/polling_b2b_transfer/slave/ecspi_polling_b2b_transfer_slave.c
+#ifdef SPI_SLAVE
+uint32_t slaveData[SPI_TRANSFER_SIZE];
+ecspi_slave_handle_t g_s_handle;
+volatile bool isTransferCompleted = false;
+
+// callback for slave
+void ECSPI_SlaveUserCallback(ECSPI_Type *base, ecspi_slave_handle_t *handle,
+			     status_t status, void *userData)
+{
+	if (status == kStatus_Success) {
+		isTransferCompleted = true;
+	}
+
+	if (status == kStatus_ECSPI_HardwareOverFlow) {
+		log(TYPE_LOG_WARN, "Overflow in spi transfer");
+	}
+}
+
+static void spi_task(void *param)
+{
+	ecspi_slave_config_t slaveConfig;
+	ecspi_transfer_t slaveXfer;
+
+	/* Slave config:
+	 * slaveConfig.channel = kECSPI_Channel0;
+	 * slaveConfig.burstLength = 8;
+	 * slaveConfig.txFifoThreshold = 1;
+	 * slaveConfig.rxFifoThreshold = 0;
+	 */
+	ECSPI_SlaveGetDefaultConfig(&slaveConfig);
+	// burstLength should be at least the size of a byte to not lose data per word
+	slaveConfig.burstLength = SPI_TRANSFER_SIZE * 32;
+	ECSPI_SlaveInit(ECSPI1, &slaveConfig);
+
+	ECSPI_SlaveTransferCreateHandle(ECSPI1, &g_s_handle,
+					ECSPI_SlaveUserCallback, NULL);
+
+	// wait for rpmsg to have finished init handshake
+	while (!rpmsg_ready)
+		;
+	log(TYPE_LOG_INFO, "spi ready");
+
+	for (;;) {
+		memset(slaveData, 0, sizeof(slaveData));
+
+		isTransferCompleted = false;
+		slaveXfer.txData = NULL;
+		slaveXfer.rxData = slaveData;
+		slaveXfer.dataSize = SPI_TRANSFER_SIZE;
+		slaveXfer.channel = kECSPI_Channel0;
+		ECSPI_SlaveTransferNonBlocking(ECSPI1, &g_s_handle, &slaveXfer);
+
+		while (!isTransferCompleted)
+			;
+
+		log(TYPE_LOG_INFO, "Got SPI message");
+		// truncate end to be safe for log(), as that uses strlen
+		slaveData[SPI_TRANSFER_SIZE - 1] = 0;
+		log(TYPE_LOG_INFO, (char *)slaveData);
+
+		isTransferCompleted = false;
+		slaveXfer.txData = slaveData;
+		slaveXfer.rxData = NULL;
+		slaveXfer.dataSize = SPI_TRANSFER_SIZE;
+		slaveXfer.channel = kECSPI_Channel0;
+		ECSPI_SlaveTransferNonBlocking(ECSPI1, &g_s_handle, &slaveXfer);
+
+		while (!isTransferCompleted)
+			;
+
+		log(TYPE_LOG_INFO, "Sent message back");
+	}
+}
+#endif
+
 void app_create_task(void)
 {
 	if (app_task_handle == NULL &&
 	    xTaskCreate(app_task, "APP_TASK", APP_TASK_STACK_SIZE, NULL,
-			tskIDLE_PRIORITY + 1, &app_task_handle) != pdPASS) {
+			tskIDLE_PRIORITY + 2, &app_task_handle) != pdPASS) {
 		PRINTF("\r\nFailed to create application task\r\n");
 		for (;;)
 			;
 	}
+#ifdef SPI_SLAVE
+	if (spi_task_handle == NULL &&
+	    xTaskCreate(spi_task, "SPI_TASK", SPI_TASK_STACK_SIZE, NULL,
+			tskIDLE_PRIORITY + 1, &spi_task_handle) != pdPASS) {
+		PRINTF("\r\nFailed to create spi task\r\n");
+		for (;;)
+			;
+	}
+#endif
 }
 
 /*!
