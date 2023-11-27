@@ -42,8 +42,8 @@ static struct rpmsg_lite_instance *volatile rpmsg = NULL;
 static struct rpmsg_lite_endpoint *volatile rpmsg_endpoint = NULL;
 static volatile rpmsg_queue_handle rpmsg_queue = NULL;
 
-// info
-static int log_level = 2;
+// default to info -- we compare diff to debug.
+static int log_level = TYPE_LOG_INFO - TYPE_LOG_DEBUG;
 
 void app_destroy_task(void)
 {
