@@ -194,7 +194,7 @@ int main(void)
 	BOARD_InitDebugConsole();
 
 	/* demo uses GPIO1_IO15, CON11 pin 24 on Armadillo IoT G4 / X2 */
-	gpio_pin_config_t config = {kGPIO_DigitalOutput, 1, kGPIO_NoIntmode};
+	gpio_pin_config_t config = { kGPIO_DigitalOutput, 1, kGPIO_NoIntmode };
 	GPIO_PinInit(GPIO1, 15U, &config);
 
 	copyResourceTable();
