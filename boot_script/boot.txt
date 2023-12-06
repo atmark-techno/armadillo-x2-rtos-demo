@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # load and boot cortex core.
 # The commands below are for standard TCM mode
 load mmc ${mmcdev}:${mmcpart} 0x48000000 /boot/armadillo_rtos_demo.bin

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // channel name, up to 32 bytes
 #define RPMSG_LITE_NS_ANNOUNCE_STRING "rpmsg-armadillo-demo-channel"
 

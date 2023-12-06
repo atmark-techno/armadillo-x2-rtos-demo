@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # The west manifest file (west.yml) for this example, based on the MCUXpresso SDK.
 #
 # The per-workspace west configuration file, ${workspace_path}/.west/config,
