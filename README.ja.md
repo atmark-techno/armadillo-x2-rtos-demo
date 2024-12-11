@@ -356,3 +356,5 @@ armadillo:~# cp /mnt/rpmsg_armadillo.ko /lib/modules/$(uname -r)/extras
 armadillo:~# echo armadillo_rtos_demo.elf > /sys/class/remoteproc/remoteproc0/firmware
 armadillo:~# echo start > /sys/class/remoteproc/remoteproc0/state
 ```
+
+Note: remoteproc で M コアを停止するとハングすることがありますので、テスト以外に利用できません。詳細は [AN5317](https://www.nxp.com/docs/en/application-note/AN5317.pdf) を参照ください。
